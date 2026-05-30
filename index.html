@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Pencarian & Unduh Dokumen</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons (untuk ikon modern) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PapaParse CDN untuk membaca CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght=300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        /* Animasi halusan */
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- Header / Navbar -->
+    <header class="bg-white border-b border-slate-100 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-blue-600 text-white rounded-xl shadow-md shadow-blue-200">
+                    <i data-lucide="graduation-cap" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight text-slate-900">Portal Layanan Data</h1>
+                    <p class="text-xs text-slate-500">Verifikasi dokumen</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="connection-status" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    Menghubungkan basis data...
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Konten Utama -->
+    <main class="flex-grow max-w-4xl w-full mx-auto px-4 py-8 md:py-12">
+        
+        <!-- Hero Section -->
+        <div class="text-center mb-10">
+            <h2 class="text-3xl font-extrabold text-slate-900 sm:text-4xl tracking-tight">
+                Sertifikat Logaritma
+            </h2>
+            <p class="mt-3 text-slate-600 max-w-xl mx-auto text-sm sm:text-base">
+                Silakan masukkan NISN Anda untuk melihat dan mengunduh sertifikat
+            </p>
+        </div>
+
+        <!-- Kotak Pencarian -->
+        <div class="bg-white rounded-2xl p-6 shadow-xl shadow-slate-100 border border-slate-100 max-w-2xl mx-auto mb-8">
+            <form id="search-form" class="space-y-4">
+                <div>
+                    <label for="nisn-input" class="block text-sm font-semibold text-slate-700 mb-2">Masukkan NISN</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="search" class="w-5 h-5"></i>
+                        </div>
+                        <input 
+                            type="text" 
+                            id="nisn-input" 
+                            required
+                            placeholder="Contoh: 0081234567" 
+                            class="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 placeholder-slate-400 font-medium transition duration-150"
+                        >
+                    </div>
+                </div>
+                <button 
+                    type="submit" 
+                    id="search-btn"
+                    disabled
+                    class="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl shadow-lg shadow-blue-100 hover:shadow-none transition duration-150"
+                >
+                    <i data-lucide="search" class="w-5 h-5"></i>
+                    <span>Cari Data Siswa</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Area Hasil Pencarian (Kondisional) -->
+        <div id="result-area" class="hidden fade-in max-w-3xl mx-auto space-y-6">
+            
+            <!-- Informasi Profil Siswa -->
+            <div class="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100">
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-xs uppercase tracking-wider font-semibold opacity-75">Hasil Pencarian</span>
+                            <h3 id="res-nama" class="text-xl font-bold mt-1">Nama Siswa</h3>
+                        </div>
+                        <div class="bg-white/10 p-2 rounded-lg">
+                            <i data-lucide="user-check" class="w-6 h-6"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-slate-100 bg-slate-50/50">
+                    <div class="space-y-1">
+                        <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">No. Urut</p>
+                        <p id="res-no" class="text-base font-bold text-slate-800">-</p>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">NISN</p>
+                        <p id="res-nisn" class="text-base font-bold text-slate-800">-</p>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="text-xs text-slate-500 font-medium uppercase tracking-wider">Asal Sekolah</p>
+                        <p id="res-sekolah" class="text-base font-bold text-slate-800">-</p>
+                    </div>
+                </div>
+
+                <!-- Aksi (Unduh & Tautan Baru) -->
+                <div class="p-6 flex flex-col sm:flex-row gap-4 justify-between items-center bg-white">
+                    <div class="flex items-center gap-3">
+                        <div class="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+                            <i data-lucide="file-text" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-800">Berkas Tersedia</p>
+                            <p class="text-xs text-slate-500">Anda dapat langsung melihat pratinjau atau mengunduh</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        <a 
+                            id="btn-external" 
+                            target="_blank" 
+                            class="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-sm transition"
+                        >
+                            <i data-lucide="external-link" class="w-4 h-4"></i>
+                            Buka di Tab Baru
+                        </a>
+                        <a 
+                            id="btn-download" 
+                            download
+                            class="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-sm shadow-md shadow-emerald-100 transition"
+                        >
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            Unduh Sekarang
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Frame Pratinjau Dokumen -->
+            <div id="preview-container" class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
+                <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="eye" class="text-blue-600 w-5 h-5"></i>
+                        <h4 class="font-bold text-slate-800 text-sm sm:text-base">Pratinjau Dokumen</h4>
+                    </div>
+                    <span class="text-xs text-slate-400">Interaktif</span>
+                </div>
+                <div class="relative w-full aspect-[4/3] sm:aspect-[16/10] bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
+                    <!-- Loading iframe -->
+                    <div id="iframe-loader" class="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
+                        <div class="flex flex-col items-center gap-2">
+                            <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p class="text-xs text-slate-500 font-medium">Memuat pratinjau berkas...</p>
+                        </div>
+                    </div>
+                    <iframe 
+                        id="preview-iframe" 
+                        class="w-full h-full border-0" 
+                        src="" 
+                        allow="autoplay"
+                        onload="document.getElementById('iframe-loader').classList.add('hidden')"
+                    ></iframe>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Alert Not Found / Error -->
+        <div id="alert-box" class="hidden fade-in max-w-2xl mx-auto p-4 bg-rose-50 border border-rose-100 rounded-xl text-rose-800 flex items-start gap-3">
+            <i data-lucide="alert-circle" class="w-5 h-5 shrink-0 mt-0.5 text-rose-600"></i>
+            <div>
+                <h4 class="font-bold text-sm">Data Tidak Ditemukan</h4>
+                <p class="text-xs text-rose-600 mt-1" id="alert-message">
+                    NISN yang Anda masukkan tidak terdaftar. Mohon periksa kembali nomor yang Anda masukkan.
+                </p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-100 py-6">
+        <div class="max-w-6xl mx-auto px-4 text-center space-y-2">
+            <p class="text-xs text-slate-500">
+                &copy; 2026 Portal Layanan Sekolah. Semua Hak Dilindungi.
+            </p>
+            <p class="text-[10px] text-slate-400">
+                Sistem menarik data secara langsung & aman dari Google Spreadsheet terenkripsi.
+            </p>
+        </div>
+    </footer>
+
+    <!-- JS Logic -->
+    <script>
+        // Tautan Spreadsheet CSV Publik Anda
+        const SPREADSHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSg-KToKOI9Ivxa_g2e-79oOEum5tblQlsJ7uXOsHQKA3t-2wPbkDP2PL_TM7WUYbtv1o9GsdPEU83/pub?gid=254215133&single=true&output=csv";
+        
+        let localData = []; // Menyimpan data hasil parse CSV
+
+        // Inisialisasi Ikon Lucide
+        lucide.createIcons();
+
+        // 1. Fungsi Mengambil & Memproses CSV
+        async function loadDatabase() {
+            const statusIndicator = document.getElementById('connection-status');
+            const searchBtn = document.getElementById('search-btn');
+
+            try {
+                const response = await fetch(SPREADSHEET_CSV_URL);
+                if (!response.ok) throw new Error('Gagal mengunduh berkas basis data.');
+                
+                const csvText = await response.text();
+                
+                // Parse CSV menggunakan PapaParse
+                Papa.parse(csvText, {
+                    header: false, // Menggunakan array indeks karena lebih konsisten
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        // Simpan data (abaikan baris pertama jika itu header nama kolom)
+                        const rows = results.data;
+                        if (rows.length > 0) {
+                            // Cek apakah baris pertama header
+                            const isHeader = rows[0][0].toLowerCase().includes('no') || rows[0][3].toLowerCase().includes('nisn');
+                            localData = isHeader ? rows.slice(1) : rows;
+                        }
+                        
+                        // Perbarui Status UI
+                        statusIndicator.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200";
+                        statusIndicator.innerHTML = `
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            Basis Data Terhubung
+                        `;
+                        searchBtn.disabled = false;
+                    },
+                    error: function(err) {
+                        throw new Error(err.message);
+                    }
+                });
+
+            } catch (error) {
+                console.error(error);
+                statusIndicator.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200";
+                statusIndicator.innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                    Gagal memuat basis data
+                `;
+                showAlert("Sistem gagal terhubung ke Google Sheets. Silakan muat ulang halaman atau hubungi administrator.");
+            }
+        }
+
+        // 2. Fungsi Mengolah Tautan Google Drive untuk Preview & Download
+        function parseDriveLink(originalUrl) {
+            if (!originalUrl) return { preview: "", download: originalUrl };
+            
+            // Bersihkan spasi atau karakter tak terlihat
+            const url = originalUrl.trim();
+
+            // Regex deteksi pola ID Google Drive file
+            const drivePattern = /\/file\/d\/([a-zA-Z0-9_-]+)/;
+            const driveIdMatch = url.match(drivePattern);
+
+            if (driveIdMatch && driveIdMatch[1]) {
+                const fileId = driveIdMatch[1];
+                return {
+                    preview: `https://drive.google.com/file/d/${fileId}/preview`,
+                    download: `https://drive.google.com/uc?export=download&id=${fileId}`
+                };
+            }
+
+            // Fallback jika bukan link Google Drive
+            return {
+                preview: url,
+                download: url
+            };
+        }
+
+        // 3. Fungsi Menampilkan Alert Kustom
+        function showAlert(message) {
+            const alertBox = document.getElementById('alert-box');
+            const alertMessage = document.getElementById('alert-message');
+            const resultArea = document.getElementById('result-area');
+
+            alertMessage.textContent = message;
+            alertBox.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+        }
+
+        // 4. Fungsi Menyembunyikan Alert
+        function hideAlert() {
+            document.getElementById('alert-box').classList.add('hidden');
+        }
+
+        // 5. Logika Form Submit Pencarian
+        document.getElementById('search-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            hideAlert();
+
+            const inputNisn = document.getElementById('nisn-input').value.trim();
+            if (!inputNisn) return;
+
+            // Cari data berdasarkan kolom NISN (Kolom D -> Indeks 3)
+            // Lakukan normalisasi pencarian (abaikan spasi berlebih)
+            const matchedRow = localData.find(row => {
+                const cellNisn = row[3] ? row[3].toString().trim() : '';
+                return cellNisn === inputNisn;
+            });
+
+            if (matchedRow) {
+                // Tampilkan data ke UI
+                // Kolom B (Indeks 1) -> Nama
+                // Kolom C (Indeks 2) -> Sekolah
+                // Kolom D (Indeks 3) -> NISN
+                // Kolom F (Indeks 5) -> Tautan Berkas/Preview/Unduh
+                
+                const noUrut = matchedRow[0] || '-';
+                const nama = matchedRow[1] || '-';
+                const sekolah = matchedRow[2] || '-';
+                const nisn = matchedRow[3] || '-';
+                const rawLink = matchedRow[5] || '';
+
+                document.getElementById('res-no').textContent = noUrut;
+                document.getElementById('res-nama').textContent = nama;
+                document.getElementById('res-sekolah').textContent = sekolah;
+                document.getElementById('res-nisn').textContent = nisn;
+
+                // Konversi Link (Deteksi jika Google Drive)
+                const parsedUrls = parseDriveLink(rawLink);
+
+                // Setup Tombol Unduh & External
+                const btnDownload = document.getElementById('btn-download');
+                const btnExternal = document.getElementById('btn-external');
+                const previewIframe = document.getElementById('preview-iframe');
+                const previewContainer = document.getElementById('preview-container');
+                const iframeLoader = document.getElementById('iframe-loader');
+
+                if (rawLink) {
+                    btnDownload.href = parsedUrls.download;
+                    btnDownload.classList.remove('pointer-events-none', 'opacity-50');
+                    
+                    btnExternal.href = rawLink;
+                    btnExternal.classList.remove('pointer-events-none', 'opacity-50');
+
+                    // Set preview iframes
+                    if (parsedUrls.preview) {
+                        iframeLoader.classList.remove('hidden');
+                        previewContainer.classList.remove('hidden');
+                        previewIframe.src = parsedUrls.preview;
+                    } else {
+                        previewContainer.classList.add('hidden');
+                    }
+                } else {
+                    // Jika tidak ada tautan di kolom F
+                    btnDownload.removeAttribute('href');
+                    btnDownload.classList.add('pointer-events-none', 'opacity-50');
+                    btnExternal.removeAttribute('href');
+                    btnExternal.classList.add('pointer-events-none', 'opacity-50');
+                    previewContainer.classList.add('hidden');
+                }
+
+                // Tampilkan area hasil
+                document.getElementById('result-area').classList.remove('hidden');
+            } else {
+                showAlert(`Data dengan NISN "${inputNisn}" tidak ditemukan. Harap pastikan NISN sudah benar.`);
+            }
+        });
+
+        // Jalankan pemuatan basis data saat dokumen siap
+        window.onload = function() {
+            loadDatabase();
+        };
+    </script>
+</body>
+</html>
